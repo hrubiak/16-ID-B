@@ -1,11 +1,11 @@
 .. _home:
 
-16-BM-B PE Press Experiments User Manual
-========================================
+16-ID-B User Manual
+===================
 
-.. figure:: /images/beamline_16bmb.jpg
-   :alt: 16-BM-B
-   :width: 720px
+.. figure:: /images/IDB_micro_focused_angle_dispersive_XRD-crop_0.jpg
+   :alt: 16-ID-B
+   :width: 360px
    :align: center
 
 
@@ -20,9 +20,3 @@
    beamline_support
    staff
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Beamline software:
-   
-   hpmca
-   

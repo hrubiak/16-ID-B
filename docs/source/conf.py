@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = '16-BM-B Docs'
-copyright = '2022, Argonne National Laboratory'
-author = 'R. Hrubiak'
+project = '16idb-socs'
+copyright = '2024, Argonne National Laboratory'
+author = 'R. Hrubiak, D. Smith, and J. S. Smith'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1'
