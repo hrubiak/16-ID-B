@@ -17,7 +17,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = '16idb-socs'
+project = '16idb-docs'
 copyright = '2024, Argonne National Laboratory'
 author = 'R. Hrubiak, D. Smith, and J. S. Smith'
 
