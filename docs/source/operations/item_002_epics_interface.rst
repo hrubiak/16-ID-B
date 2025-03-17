@@ -25,9 +25,9 @@ related buttons on this panel.
    :width: 540px
    :align: center
 
-For experimental control,
+For experimental controls,
 
-(1) 'Sample' button to open controls for sample stages
+1. 'Sample' button to open controls for sample stages
 
 .. figure:: /images/operation/epics/16IDB_LH_Sample-XPS_Short.adl.png
    :alt: 16IDB_LH_Sample-XPS_Short.adl
@@ -48,14 +48,14 @@ button to go back to the 'Sample stage (short) page. This
 page hides the LH CEN X control to prevent acidental
 change of the stage position.
 
-(2) 'Pinhole' button for pinhole position optimazition if needed
+2. 'Pinhole' button for pinhole position optimazition if needed
 
 .. figure:: /images/operation/epics/16IDB_LH_Pinhole_user_Short.adl.png
    :alt: 16IDB_LH_Pinhole_user_Short.adl
    :width: 400px
    :align: center
 
-(3) 'Detectors' button for switching detectors or changing
+3. 'Detectors' button for switching detectors or changing
 detector position if needed.
 
 .. figure:: /images/operation/epics/16IDB_LH_Detectors.adl.png
