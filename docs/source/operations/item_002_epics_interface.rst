@@ -3,9 +3,14 @@ Start Laser Heating EPICS/MEDM user interface
 
 On the Windows desktop of the control computer, users will find a shortcut named ``16idb MEDM``.
 
+Alternatively, the MEDM can be started manually:
+
+   1.	In MobaXterm, start a session in veneno* as s16idbuser
+   2.	At the prompt, type: source .bashrc
+   3.	At the prompt, type: start_MEDM_S16idbdserv
+
 .. note:: MobaXterm program should be started or runnning in the background before opening the MEDM interface, otherwise
           the interface will not start. 
-
 
 Attached below is a screen shot of the 16ID-B upper level status/control panel.
 
@@ -13,7 +18,7 @@ Attached below is a screen shot of the 16ID-B upper level status/control panel.
    :alt: 00_16ID.adl
    :width: 200px
    :align: center
-
+ 
 To operate Laser Heating Table
 
 Click on "Laser Heating Table" to start 16IDB LH Table control
