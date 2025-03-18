@@ -18,6 +18,7 @@ Each method is described below.
    - 2D parameters and count time are set in scan control
    - Press 'start scan' to start
 
+
 2. HPCAT SXD's Grid Scan with either MAR CCD or Pilatus.
    
     Sample is rotated at each position when XRD is collected.
@@ -79,7 +80,7 @@ Each method is described below.
 
   Remember that EPICS variables are case-sensitive. Remember also in MEDM that you must keep your mouse pointer inside the field when typing, and that you should hit Enter to lock in your entry before moving the pointer away.
 
-  Next, in **Scan-2**, enter **XpsLH:m3.RBV** and **XpsLH:m3.VA**L as the read and drive variables, respectively. This will instruct **Scan-2** to move **LH SAM Z**, the vertical motion of the LH table sample stage.
+  Next, in **Scan-2**, enter **XpsLH:m3.RBV** and **XpsLH:m3.VAL** as the read and drive variables, respectively. This will instruct **Scan-2** to move **LH SAM Z**, the vertical motion of the LH table sample stage.
 
   As before, set the number of desired steps in **#PTS** field in the upper-right hand corner, and the size of the vertical scan in the **START** and **END** fields.
 

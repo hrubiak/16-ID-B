@@ -16,6 +16,7 @@
    beamline_description
    sample_preparation
    beamline_operation
+   beamline_software
    beamline_troubleshooting
    beamline_support
    staff
