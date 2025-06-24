@@ -5,7 +5,7 @@
 
 .. figure:: /images/IDB_micro_focused_angle_dispersive_XRD-crop_0.jpg
    :alt: 16-ID-B
-   :width: 360px
+   :width: 60%
    :align: center
 
 
