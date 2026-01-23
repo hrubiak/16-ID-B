@@ -1,259 +1,422 @@
-from reportlab.pdfgen import canvas 
+from reportlab.pdfgen import canvas
 from reportlab.pdfbase.acroform import AcroForm
 from reportlab.lib.pagesizes import letter
-from pypdf import PdfReader, PdfWriter 
-from pypdf.generic import NameObject  
 
-base_pdf = "Laser_Heating_Beamtime_Form_fillable_v11_base.pdf"
-final_pdf = "Laser_Heating_Beamtime_Form_fillable_v11_autolock_previewfriendly.pdf"
+DEFAULT_ENERGY = 29.2
+default_note = (
+    f"Default energy (keV): {DEFAULT_ENERGY:.1f}. "
+    f"16-ID-B uses {DEFAULT_ENERGY:.1f} keV for 99% of its experiments, "
+    "note that requesting a different energy will add some setup time "
+    "for your beamline scientist."
+)
 
-c = canvas.Canvas(base_pdf, pagesize=letter)
+DEFAULT_FOCUS = 1.5
+
+final_pdf = "Laser_Heating_Beamtime_Form_fillable_v11_checked_no_overlap_with_energy_dropdown.pdf"
+
+FF_MULTILINE = 1 << 12      # 4096
+FF_DONOTSCROLL = 1 << 24    # 16777216
+
+# Acrobat choice field flags
+FF_COMBO = 1 << 17     # dropdown
+FF_EDIT  = 1 << 18     # allow typing
+
+# Turn this on temporarily to see bounding boxes for every label/field
+DEBUG_BOXES = False
+
+c = canvas.Canvas(final_pdf, pagesize=letter)
 form = AcroForm(c)
 width, height = letter
+
+LEFT = 72
+RIGHT_WIDE = 400
+
+# Vertical rhythm
+LINE_H = 14
+GAP_SMALL = 6
+GAP_MED = 10
+GAP_LARGE = 18
+
+
+def _debug_rect(x, y, w, h):
+    if not DEBUG_BOXES:
+        return
+    c.saveState()
+    c.setLineWidth(0.5)
+    c.rect(x, y, w, h, stroke=1, fill=0)
+    c.restoreState()
+
 
 def draw_text(x, y, text, font="Helvetica", size=11):
     c.setFont(font, size)
     c.drawString(x, y, text)
+    _debug_rect(x, y - 2, min(500, len(text) * (size * 0.55)), size + 4)
 
-def draw_field(name, x, y, w=260, h=18, border_style="underlined"):
-    form.textfield(name=name, tooltip=name, x=x, y=y, width=w, height=h, borderStyle=border_style)
+
+def draw_field(name, x, y, w=260, h=18, border_style="underlined", font_size=11, field_flags=0):
+    form.textfield(
+        name=name,
+        tooltip=name,
+        x=x,
+        y=y,
+        width=w,
+        height=h,
+        borderStyle=border_style,
+        fontSize=font_size,
+        fieldFlags=field_flags,
+    )
+    _debug_rect(x, y, w, h)
+
+
+def draw_multiline_field(name, x, y, w, h, border_style="solid", font_size=10):
+    flags = (FF_MULTILINE) & (~FF_DONOTSCROLL)
+    draw_field(
+        name,
+        x,
+        y,
+        w=w,
+        h=h,
+        border_style=border_style,
+        font_size=font_size,
+        field_flags=flags,
+    )
+
+
+def draw_combo_caret(x, y, w, h):
+    """Visual hint so it reads like a dropdown."""
+    cx = x + w - 10
+    cy = y + h / 2 + 1
+    c.saveState()
+    c.setLineWidth(1)
+    c.line(cx - 3, cy + 2, cx, cy - 2)
+    c.line(cx, cy - 2, cx + 3, cy + 2)
+    c.restoreState()
+
+
+def draw_dropdown(name, x, y, options, w=220, h=18, font_size=10,
+                  tooltip=None, editable=False, default_value=None):
+    """
+    options: list[str] (display strings)
+    """
+    flags = FF_COMBO | (FF_EDIT if editable else 0)
+
+    if default_value is None:
+        default_value = options[0] if options else ""
+
+    form.choice(
+        name=name,
+        tooltip=tooltip or name,
+        x=x,
+        y=y,
+        width=w,
+        height=h,
+        options=options,
+        value=default_value,
+        borderStyle="solid",
+        fontSize=font_size,
+        fieldFlags=flags,
+    )
+    draw_combo_caret(x, y, w, h)
+    _debug_rect(x, y, w, h)
+
 
 def draw_checkbox(name, x, y, label):
-    form.checkbox(name=name, tooltip=label, x=x, y=y-2, size=12, buttonStyle="check")
-    c.drawString(x+16, y, label)
+    form.checkbox(name=name, tooltip=label, x=x, y=y - 2, size=12, buttonStyle="check")
+    c.drawString(x + 16, y, label)
+    if DEBUG_BOXES:
+        _debug_rect(x, y - 2, 12, 12)
+        _debug_rect(x + 16, y - 2, min(300, len(label) * 6), 14)
 
-# hidden flag
-form.textfield(name="lock_flag", tooltip="lock_flag", x=2, y=2, width=1, height=1, borderWidth=0)
 
+def label_then_field(
+    y,
+    label,
+    field_name,
+    field_w=RIGHT_WIDE,
+    field_h=18,
+    *,
+    multiline=False,
+    border_style="underlined",
+    font="Helvetica",
+    size=11,
+    field_font_size=11,
+    gap_after=GAP_LARGE,
+):
+    draw_text(LEFT, y, label, font, size)
+    y -= (LINE_H + GAP_SMALL)
+    if multiline:
+        draw_multiline_field(field_name, LEFT, y - field_h, field_w, field_h,
+                             border_style=border_style, font_size=field_font_size)
+    else:
+        draw_field(field_name, LEFT, y - field_h, field_w, field_h,
+                   border_style=border_style, font_size=field_font_size)
+    y -= (field_h + gap_after)
+    return y
+
+
+def label_then_dropdown(
+    y,
+    label,
+    field_name,
+    options,
+    field_w=240,
+    field_h=18,
+    *,
+    font="Helvetica",
+    size=11,
+    field_font_size=10,
+    gap_after=GAP_LARGE,
+    editable=False,
+    default_value=None,
+):
+    draw_text(LEFT, y, label, font, size)
+    y -= (LINE_H + GAP_SMALL)
+    draw_dropdown(
+        field_name,
+        LEFT,
+        y - field_h,
+        options=options,
+        w=field_w,
+        h=field_h,
+        font_size=field_font_size,
+        tooltip=label,
+        editable=editable,
+        default_value=default_value,
+    )
+    y -= (field_h + gap_after)
+    return y
+
+
+# Energy options (display strings only)
+energy_options = [
+    "17.998 keV (Zr)",
+    "19.986 keV (Nb)",
+    "20.000 keV (Mo)",
+    "25.514 keV (Ag)",
+    "27.941 keV (In)",
+    "29.200 keV (Sn)",
+    "30.491 keV (Sb)",
+    "33.169 keV (CsI)",
+    "35.985 keV (CsI)",
+    "38.925 keV (La)",
+    "40.443 keV (Ce)",
+    "41.989 keV (Pr)",
+    "50.239 keV (Gd)",
+]
+
+default_energy_str = f"{DEFAULT_ENERGY:.3f}"
+default_choice = next(
+    (s for s in energy_options if s.startswith(default_energy_str)),
+    energy_options[0],
+)
+
+# -------------------------
 # PAGE 1
+# -------------------------
 y = height - 72
-draw_text(72, y, "Laser Heating Beamtime Pre-Experiment Questionnaire", "Helvetica-Bold", 18)
-y -= 50
-draw_text(72, y, "General", "Helvetica-Bold", 13)
-y -= 30
-
-draw_text(72, y, "1. Beamtime Dates")
-y -= 20
-draw_field("beamtime_dates", 72, y, 400)
-y -= 40
-
-draw_text(72, y, "2. Radiological Beamtime?")
-y -= 20
-draw_checkbox("rad_no", 72, y, "No")
-draw_checkbox("rad_yes", 140, y, "Yes")
-draw_checkbox("rad_part", 220, y, "Partially")
-y -= 40
-
-draw_text(72, y, "3. What technique(s) are we trying to use?")
-y -= 25
-draw_checkbox("tech_std", 72, y, "Standard DAC (no LH)")
-draw_checkbox("tech_lhdac", 260, y, "Laser-heated DAC")
-y -= 20
-draw_checkbox("tech_memb", 72, y, "Membrane-driven compression")
-y -= 20
-draw_checkbox("tech_ddac", 72, y, "Dynamic DAC (dDAC / time-resolved)")
-y -= 20
-draw_checkbox("tech_res", 72, y, "Resistively heated")
-draw_checkbox("tech_sc", 260, y, "Single-crystal / Multi-grain DAC")
-y -= 20
-draw_checkbox("tech_tor", 72, y, "Toroidal DAC")
-y -= 30
-draw_text(72, y, "Other (please specify):")
-y -= 20
-draw_field("tech_other", 72, y, 400)
+draw_text(LEFT, y, "Laser Heating Beamtime Pre-Experiment Questionnaire", "Helvetica-Bold", 18)
 y -= 50
 
-draw_text(72, y, "4. What DAC types will you be bringing?")
-y -= 25
-draw_checkbox("dac_std", 72, y, "Standard symmetric DAC (Princeton type)")
-y -= 20
-draw_checkbox("dac_bx90", 72, y, "BX-90")
-draw_checkbox("dac_mem", 260, y, "Membrane-driven DAC")
-y -= 20
-draw_checkbox("dac_ddac", 72, y, "Dynamic DAC (dDAC)")
-draw_checkbox("dac_vac", 260, y, "DAC in vacuum jacket")
-y -= 20
-draw_checkbox("dac_custom", 72, y, "Custom / in-house DAC")
-draw_checkbox("dac_holder", 260, y, "Need a custom holder for DAC?")
+draw_text(LEFT, y, "General", "Helvetica-Bold", 13)
 y -= 30
-draw_text(72, y, "Other (please specify):")
-y -= 20
-draw_field("dac_other", 72, y, 400)
 
+y = label_then_field(y, "1. Beamtime Dates", "beamtime_dates",
+                     field_w=RIGHT_WIDE, field_h=18)
+
+draw_text(LEFT, y, "2. Radiological Beamtime?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("rad_no", LEFT, y, "No")
+draw_checkbox("rad_yes", LEFT + 68, y, "Yes")
+draw_checkbox("rad_part", LEFT + 148, y, "Partially")
+y -= (18 + GAP_LARGE)
+
+draw_text(LEFT, y, "3. What technique(s) are we trying to use?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("tech_std", LEFT, y, "Standard DAC (no LH)")
+draw_checkbox("tech_lhdac", LEFT + 188, y, "Laser-heated DAC")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("tech_memb", LEFT, y, "Membrane-driven compression")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("tech_ddac", LEFT, y, "Dynamic DAC (dDAC / time-resolved)")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("tech_res", LEFT, y, "Resistively heated")
+draw_checkbox("tech_sc", LEFT + 188, y, "Single-crystal / Multi-grain DAC")
+y -= (LINE_H + GAP_MED)
+draw_checkbox("tech_tor", LEFT, y, "Toroidal DAC")
+y -= (LINE_H + GAP_MED)
+
+y = label_then_field(y, "Other (please specify):", "tech_other",
+                     field_w=RIGHT_WIDE, field_h=18)
+
+draw_text(LEFT, y, "4. What DAC types will you be bringing?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("dac_std", LEFT, y, "Standard symmetric DAC (Princeton type)")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("dac_bx90", LEFT, y, "BX-90")
+draw_checkbox("dac_mem", LEFT + 188, y, "Membrane-driven DAC")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("dac_ddac", LEFT, y, "Dynamic DAC (dDAC)")
+draw_checkbox("dac_vac", LEFT + 188, y, "DAC in vacuum jacket")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("dac_custom", LEFT, y, "Custom / in-house DAC")
+draw_checkbox("dac_holder", LEFT + 188, y, "Need a custom holder for DAC?")
+y -= (LINE_H + GAP_MED)
+
+y = label_then_field(y, "Other (please specify):", "dac_other",
+                     field_w=RIGHT_WIDE, field_h=18, gap_after=0)
+
+# -------------------------
 # PAGE 2
+# -------------------------
 c.showPage()
 form = AcroForm(c)
-form.textfield(name="lock_flag", tooltip="lock_flag", x=2, y=2, width=1, height=1, borderWidth=0)
 
 y = height - 72
-draw_text(72, y, "Beam Specs", "Helvetica-Bold", 13)
+draw_text(LEFT, y, "Beam Specs", "Helvetica-Bold", 13)
 y -= 40
 
-draw_text(72, y, "5. Sample chamber sizes (µm) (please list)")
-y -= 20
-draw_field("sample_chamber", 72, y, 400)
-y -= 40
+y = label_then_field(y, "5. Sample chamber sizes (µm) (please list)",
+                     "sample_chamber", field_w=RIGHT_WIDE, field_h=18)
 
-draw_text(72, y, "6. Required X-ray focus, FWHM (µm × µm)")
-y -= 20
-draw_field("xray_focus", 72, y, 400)
+y = label_then_field(y, "6. Required X-ray focus, FWHM (µm × µm)",
+                     "xray_focus", field_w=RIGHT_WIDE, field_h=18, gap_after=GAP_MED)
+
+draw_text(LEFT, y, f"Typical focus (µm × µm): {DEFAULT_FOCUS}×{DEFAULT_FOCUS}", "Helvetica-Oblique", 9)
+y -= (LINE_H - 2)
+
+y -= (GAP_LARGE)
+
+# Q7 dropdown
+y = label_then_dropdown(
+    y,
+    "7. Preferred X-ray energy (keV)",
+    "pref_energy",
+    energy_options,
+    field_w=260,
+    field_h=18,
+    field_font_size=10,
+    gap_after=GAP_MED,
+    editable=False,
+    default_value=default_choice,
+)
+
+# Draw as two lines so it doesn't run off the page
+draw_text(LEFT, y, default_note[:90], "Helvetica-Oblique", 9)
+y -= LINE_H
+draw_text(LEFT, y, default_note[90:], "Helvetica-Oblique", 9)
+y -= GAP_LARGE
+
+draw_text(LEFT, y, "8. Do you anticipate needing to defocus or change beam size during experiment?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("def_no", LEFT, y, "No")
+draw_checkbox("def_yes", LEFT + 68, y, "Yes")
+y -= (18 + GAP_MED)
+
+y = label_then_field(y, "If yes, please describe:", "def_desc",
+                     field_w=RIGHT_WIDE, field_h=68,
+                     multiline=True, border_style="solid")
+
+draw_text(LEFT, y, "Mirrors", "Helvetica-Bold", 13)
 y -= 30
 
-draw_text(72, y, "Typical focus (µm × µm):", "Helvetica-Oblique", 9)
-y -= 18
-draw_field("typ_focus_x", 72, y, 80, 16)
-draw_text(160, y+4, "×", "Helvetica", 11)
-draw_field("typ_focus_y", 180, y, 80, 16)
-y -= 40
+draw_text(LEFT, y, "9. Which mirror will be used? (default: LKB)")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("mirror_skb", LEFT, y, "SKB")
+draw_checkbox("mirror_lkb", LEFT + 68, y, "LKB")
+y -= (18 + GAP_LARGE)
 
-draw_text(72, y, "7. Preferred X-ray energy (keV)")
-y -= 20
-draw_field("pref_energy", 72, y, 400)
-y -= 30
+draw_text(LEFT, y, "10. Isolation mode? (Only for radiological beamtime)")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("iso_no", LEFT, y, "No")
+draw_checkbox("iso_yes", LEFT + 68, y, "Yes")
+y -= (18 + GAP_MED)
 
-draw_text(72, y, "Default energy (keV):", "Helvetica-Oblique", 9)
-y -= 18
-draw_field("default_energy", 72, y, 100, 16)
-y -= 40
+y = label_then_field(
+    y,
+    "Expected energy, mirror, or isolation mode changes during beamtime:",
+    "mirror_changes",
+    field_w=RIGHT_WIDE,
+    field_h=40,
+    multiline=True,
+    border_style="solid",
+    gap_after=0,
+)
 
-draw_text(72, y, "8. Do you anticipate needing to defocus or change beam size during experiment?")
-y -= 20
-draw_checkbox("def_no", 72, y, "No")
-draw_checkbox("def_yes", 140, y, "Yes")
-y -= 30
-
-draw_text(72, y, "If yes, please describe:")
-y -= 0
-# Multiline box for Q8
-draw_field("def_desc", 72, y-72, 400, 68, border_style="solid")
-y -= 100
-
-draw_text(72, y, "Mirrors", "Helvetica-Bold", 13)
-y -= 30
-
-draw_text(72, y, "9. Which mirror will be used? (default: LKB)")
-y -= 20
-draw_checkbox("mirror_skb", 72, y, "SKB")
-draw_checkbox("mirror_lkb", 140, y, "LKB")
-y -= 40
-
-draw_text(72, y, "10. Isolation mode? (Only for radiological beamtime)")
-y -= 20
-draw_checkbox("iso_no", 72, y, "No")
-draw_checkbox("iso_yes", 140, y, "Yes")
-y -= 30
-
-draw_text(72, y, "Expected energy, mirror, or isolation mode changes during beamtime:")
-y -= 25
-draw_field("mirror_changes", 72, y, 400, 40, border_style="solid")
-
-# PAGE 3 Daily plan
+# -------------------------
+# PAGE 3
+# -------------------------
 c.showPage()
 form = AcroForm(c)
-form.textfield(name="lock_flag", tooltip="lock_flag", x=2, y=2, width=1, height=1, borderWidth=0)
 
 y = height - 72
-draw_text(72, y, "Beamtime Daily Plan", "Helvetica-Bold", 13)
+draw_text(LEFT, y, "Beamtime Daily Plan", "Helvetica-Bold", 13)
 y -= 35
 
 daily_fields = ["day1", "day2", "day3", "day4", "day5plus"]
 daily_labels = ["Day 1:", "Day 2:", "Day 3:", "Day 4:", "Day 5+:"]
 
 for name, label in zip(daily_fields, daily_labels):
-    draw_text(72, y, label)
-    y -= 0
-    draw_field(name, 72, y-92, 400, 88, border_style="solid")
-    y -= 120
+    y = label_then_field(
+        y,
+        label,
+        name,
+        field_w=RIGHT_WIDE,
+        field_h=88,
+        multiline=True,
+        border_style="solid",
+    )
 
+# -------------------------
 # PAGE 4
+# -------------------------
 c.showPage()
 form = AcroForm(c)
-form.textfield(name="lock_flag", tooltip="lock_flag", x=2, y=2, width=1, height=1, borderWidth=0)
 
 y = height - 72
-draw_text(72, y, "Capabilities", "Helvetica-Bold", 13)
+draw_text(LEFT, y, "Capabilities", "Helvetica-Bold", 13)
 y -= 40
 
-draw_text(72, y, "11. Online ruby system?")
-y -= 20
-draw_checkbox("ruby_no", 72, y, "No")
-draw_checkbox("ruby_yes", 140, y, "Yes")
-y -= 40
+draw_text(LEFT, y, "11. Online ruby system?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("ruby_no", LEFT, y, "No")
+draw_checkbox("ruby_yes", LEFT + 68, y, "Yes")
+y -= (18 + GAP_LARGE)
 
-draw_text(72, y, "12. Other high temperature method(s)")
-y -= 20
-draw_checkbox("ht_res", 72, y, "Resistive heating")
-y -= 30
+draw_text(LEFT, y, "12. Other high temperature method(s)")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("ht_res", LEFT, y, "Resistive heating")
+y -= (18 + GAP_MED)
 
-draw_text(72, y, "Please describe:")
-y -= 20
-draw_field("ht_desc", 72, y, 400)
-y -= 50
+y = label_then_field(y, "Please describe:", "ht_desc",
+                     field_w=RIGHT_WIDE, field_h=18)
 
-draw_text(72, y, "13. Do you need any of the following?")
-y -= 25
-draw_checkbox("need_vac", 72, y, "Vacuum pump")
-draw_checkbox("need_chill", 260, y, "Chiller")
-y -= 20
-draw_checkbox("need_tc", 72, y, "Thermocouple interface")
-y -= 30
+draw_text(LEFT, y, "13. Do you need any of the following?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("need_vac", LEFT, y, "Vacuum pump")
+draw_checkbox("need_chill", LEFT + 188, y, "Chiller")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("need_tc", LEFT, y, "Thermocouple interface")
+y -= (18 + GAP_MED)
 
-draw_text(72, y, "Other (please specify):")
-y -= 20
-draw_field("need_other", 72, y, 400)
-y -= 50
+y = label_then_field(y, "Other (please specify):", "need_other",
+                     field_w=RIGHT_WIDE, field_h=18)
 
-draw_text(72, y, "14. How do you want to heat?")
-y -= 20
-draw_checkbox("heat_sq", 72, y, "Square modulated")
-draw_checkbox("heat_cont", 260, y, "Continuous")
-y -= 25
+draw_text(LEFT, y, "14. How do you want to heat?")
+y -= (LINE_H + GAP_SMALL)
+draw_checkbox("heat_sq", LEFT, y, "Square modulated")
+draw_checkbox("heat_cont", LEFT + 188, y, "Continuous")
+y -= (18 + GAP_MED)
 
-draw_text(72, y, "Please describe:")
-
-# Multiline box for Q14 description
-draw_field("trigger_scheme", 72, y-72, 400, 68, border_style="solid")
+y = label_then_field(
+    y,
+    "Please describe:",
+    "trigger_scheme",
+    field_w=RIGHT_WIDE,
+    field_h=68,
+    multiline=True,
+    border_style="solid",
+    gap_after=0,
+)
 
 c.save()
-
-# ---------- Postprocess: set multiline flags and inject JS ----------
-reader = PdfReader(base_pdf)
-writer = PdfWriter()
-for page in reader.pages:
-    writer.add_page(page)
-
-acro = reader.trailer["/Root"].get("/AcroForm")
-if acro:
-    writer._root_object.update({NameObject("/AcroForm"): acro})
-
-def iter_fields(field_refs):
-    for fref in field_refs:
-        fobj = fref.get_object()
-        yield fobj
-        kids = fobj.get("/Kids")
-        if kids:
-            yield from iter_fields(kids)
-
-writer_acro = writer._root_object.get("/AcroForm")
-field_refs = writer_acro.get("/Fields", []) if writer_acro else []
-
-MULTILINE = 4096
-DONOTSCROLL = 1 << 24
-target_names = {"day1", "day2", "day3", "day4", "day5plus", "def_desc", "trigger_scheme"}
-
-for fobj in iter_fields(field_refs):
-    t = fobj.get("/T")
-    if t and str(t) in target_names:
-        ff = int(fobj.get("/Ff", 0))
-        ff = (ff | MULTILINE) & (~DONOTSCROLL)
-        fobj.update({
-            NameObject("/Ff"): NumberObject(ff),
-            NameObject("/DA"): TextStringObject("/Helv 10 Tf 0 g"),
-        })
-
-
-
-with open(final_pdf, "wb") as f:
-    writer.write(f)
-
-final_pdf
+print(final_pdf)
