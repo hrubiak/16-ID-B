@@ -12,7 +12,7 @@ default_note = (
 
 DEFAULT_FOCUS = 1.5
 
-final_pdf = "Laser_Heating_Beamtime_Form_fillable_v11_checked_no_overlap_with_energy_dropdown.pdf"
+final_pdf = "Laser_Heating_Beamtime_Form_fillable_v12.pdf"
 
 FF_MULTILINE = 1 << 12      # 4096
 FF_DONOTSCROLL = 1 << 24    # 16777216
@@ -53,7 +53,7 @@ def draw_text(x, y, text, font="Helvetica", size=11):
     _debug_rect(x, y - 2, min(500, len(text) * (size * 0.55)), size + 4)
 
 
-def draw_field(name, x, y, w=260, h=18, border_style="underlined", font_size=11, field_flags=0):
+def draw_field(name, x, y, w=260, h=18, border_style="underlined", font_size=11, field_flags=0, maxlen=1000):
     form.textfield(
         name=name,
         tooltip=name,
@@ -64,6 +64,7 @@ def draw_field(name, x, y, w=260, h=18, border_style="underlined", font_size=11,
         borderStyle=border_style,
         fontSize=font_size,
         fieldFlags=field_flags,
+        maxlen=maxlen,
     )
     _debug_rect(x, y, w, h)
 
@@ -79,6 +80,7 @@ def draw_multiline_field(name, x, y, w, h, border_style="solid", font_size=10):
         border_style=border_style,
         font_size=font_size,
         field_flags=flags,
+        maxlen=5000,
     )
 
 
