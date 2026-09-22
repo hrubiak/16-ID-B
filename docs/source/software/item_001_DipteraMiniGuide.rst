@@ -1,3 +1,5 @@
+.. _diptera_miniguide:
+
 Diptera Miniguide
 -----------------
 

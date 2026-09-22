@@ -1,5 +1,5 @@
-Start Laser Heating EPICS/MEDM user interface
----------------------------------------------
+Start EPICS/MEDM user interface
+-------------------------------
 
 .. note:: MobaXterm program should be started or runnning in the background before opening the MEDM interface, otherwise
           the interface will not start. 

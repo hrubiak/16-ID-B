@@ -14,6 +14,5 @@ Scan program "Diptera"
 5. Scan parameters are set in scan control area. Green light is
    required for scan to start.
 
-.. hint:: 1. The diptera program is located in directory: C:\\Python27\\HPCAT Programs. 
-          2. For detailed instruction,
-             see user manual 'DipteraMiniGuide'.     
+.. hint:: 1. The diptera program is located in directory: C:\\Python27\\HPCAT Programs.
+          2. For detailed instruction, see the :ref:`Diptera Miniguide <diptera_miniguide>`.
