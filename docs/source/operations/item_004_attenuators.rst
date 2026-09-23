@@ -3,7 +3,7 @@
 Setting X-ray attenuation
 -------------------------
 
-.. note:: **Returning users, please read.** After the APS-U upgrade the
+.. note:: **Users returning after APS-U, please read.** After the APS-U upgrade the
    beam at 16-ID-B is roughly **two orders of magnitude brighter** at our
    typical energies, and the current detector is also more sensitive. Net
    throughput is up by about **100x** compared to pre-upgrade conditions.
